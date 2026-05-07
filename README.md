@@ -17,8 +17,8 @@ The default user is created by `auth-service` on startup if it does not exist.
 ## Build JARs
 
 ```sh
-mvn -f auth-service/pom.xml clean package
-mvn -f catalog-service/pom.xml clean package
+mvn -f auth-service/pom.xml clean verify
+mvn -f catalog-service/pom.xml clean verify
 ```
 
 Artifacts:
@@ -27,6 +27,72 @@ Artifacts:
 auth-service/target/auth-service-1.0.0.jar
 catalog-service/target/catalog-service-1.0.0.jar
 ```
+
+JaCoCo coverage reports are generated at:
+
+```text
+auth-service/target/site/jacoco/index.html
+catalog-service/target/site/jacoco/index.html
+```
+
+## Jenkins Pipeline
+
+The root `Jenkinsfile` builds both services from this single repository.
+
+Pipeline flow:
+
+```text
+SCM checkout
+Maven unit tests and JaCoCo reports
+80% line coverage gate
+SonarQube scan and quality gate
+Trivy source/filesystem scan
+Docker image build
+Trivy image scan
+ECR login, tag, and push
+Optional EKS deployment by updating existing Kubernetes Deployments
+```
+
+Jenkins agent requirements:
+
+```text
+Java 17+
+Maven
+Docker
+AWS CLI
+kubectl
+Trivy
+SonarQube Scanner tool configured in Jenkins
+```
+
+Recommended Jenkins plugins:
+
+```text
+Pipeline
+Git
+JUnit
+Email Extension
+SonarQube Scanner for Jenkins
+AWS Credentials
+Credentials Binding
+Workspace Cleanup
+```
+
+Important Jenkins parameters:
+
+```text
+AWS_ACCOUNT_ID          AWS account where ECR repositories live
+AWS_REGION              Default: ap-south-1
+AUTH_ECR_REPOSITORY     Default: microapps/auth-service
+CATALOG_ECR_REPOSITORY  Default: microapps/catalog-service
+QUALITY_THRESHOLD       Default: 80
+ALERT_EMAIL             Email for quality gate and failure alerts
+DEPLOY_TO_EKS           Set true only when Kubernetes Deployments already exist
+EKS_CLUSTER_NAME        EKS cluster used for kubectl rollout
+K8S_NAMESPACE           Namespace containing both Deployments
+```
+
+For SonarQube, create a quality gate in SonarQube with at least 80% coverage, then set `SONARQUBE_SERVER` and `SONAR_SCANNER_TOOL` to the names configured in Jenkins.
 
 ## Build Images
 
