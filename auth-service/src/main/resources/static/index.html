@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MicroShop Login</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="login-shell">
+    <section class="brand-panel">
+      <div class="brand-mark">MS</div>
+      <h1>MicroShop</h1>
+      <p>Secure access for the catalog microservice.</p>
+    </section>
+
+    <section class="login-panel">
+      <form id="loginForm" class="login-form">
+        <h2>Sign in</h2>
+        <label for="username">Username</label>
+        <input id="username" name="username" type="text" autocomplete="username" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <button id="loginButton" type="submit">Login</button>
+        <p id="message" class="message" role="alert"></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="/login.js"></script>
+</body>
+</html>
+

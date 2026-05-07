@@ -1,0 +1,11 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: catalog-service
+
+auth:
+  service-url: ${AUTH_SERVICE_URL:http://localhost:8081}
+  login-url: ${AUTH_LOGIN_URL:http://localhost:8081}
+

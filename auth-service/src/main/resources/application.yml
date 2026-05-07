@@ -1,0 +1,32 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/microapps}
+    username: ${SPRING_DATASOURCE_USERNAME:microapps}
+    password: ${SPRING_DATASOURCE_PASSWORD:microapps}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:change-this-demo-secret-to-at-least-32-characters}
+    ttl-minutes: ${JWT_TTL_MINUTES:60}
+
+demo:
+  user:
+    username: ${DEMO_USERNAME:admin}
+    password: ${DEMO_PASSWORD:Password123!}
+    role: ${DEMO_ROLE:ADMIN}
+
+app:
+  catalog-url: ${CATALOG_URL:http://localhost:8082}
+
