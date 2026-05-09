@@ -393,15 +393,17 @@ PY
                 sh '''
                   set -e
                   remote_url="$(git config --get remote.origin.url)"
-                  case "$remote_url" in
-                    https://*)
-                      push_url="$(printf '%s' "$remote_url" | sed "s#https://#https://${GITOPS_USERNAME}:${GITOPS_PASSWORD}@#")"
-                      ;;
-                    *)
-                      push_url="$remote_url"
-                      ;;
-                  esac
-                  git push "$push_url" "HEAD:${BRANCH_NAME:-main}"
+                  askpass_file="$(mktemp)"
+                  trap 'rm -f "$askpass_file"' EXIT
+                  cat > "$askpass_file" <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) printf '%s\n' "$GITOPS_USERNAME" ;;
+  *Password*) printf '%s\n' "$GITOPS_PASSWORD" ;;
+esac
+EOF
+                  chmod 700 "$askpass_file"
+                  GIT_ASKPASS="$askpass_file" GIT_TERMINAL_PROMPT=0 git push "$remote_url" "HEAD:${BRANCH_NAME:-main}"
                 '''
               } else {
                 sh 'git push origin "HEAD:${BRANCH_NAME:-main}"'
