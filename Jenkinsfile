@@ -46,7 +46,7 @@ def defaultConfig(String name) {
     case 'HELM_VALUES_FILE':
       return 'helm/microservices-demo/values-dev.yaml'
     case 'GITOPS_GIT_CREDENTIALS_ID':
-      return ''
+      return 'GitHub-pat'
     case 'GITOPS_GIT_USER_NAME':
       return 'jenkins'
     case 'GITOPS_GIT_USER_EMAIL':
