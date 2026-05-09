@@ -13,8 +13,15 @@ def services = [
   ]
 ]
 
+def localImages = [:]
+def remoteImages = [:]
+
 def defaultConfig(String name) {
   switch (name) {
+    case 'GIT_REPOSITORY_URL':
+      return 'https://github.com/pradeep-hub18/microservices-demo-app.git'
+    case 'GIT_BRANCH':
+      return 'main'
     case 'SONARQUBE_SERVER':
       return 'SonarQube'
     case 'SONAR_SCANNER_TOOL':
@@ -57,7 +64,7 @@ def defaultConfig(String name) {
 }
 
 def configValue(String name) {
-  def value = env[name]
+  def value = env.getProperty(name)
   if (value?.trim()) {
     return value.trim()
   }
@@ -126,6 +133,17 @@ def runWithGitCredentials(Closure body) {
   }
 }
 
+def checkoutSource() {
+  try {
+    checkout scm
+  } catch (ignored) {
+    echo 'No SCM context is available for checkout scm. Falling back to explicit Git checkout.'
+    git branch: configValue('GIT_BRANCH'),
+      credentialsId: configValue('GITOPS_GIT_CREDENTIALS_ID'),
+      url: configValue('GIT_REPOSITORY_URL')
+  }
+}
+
 pipeline {
   agent any
 
@@ -142,7 +160,9 @@ pipeline {
   stages {
     stage('SCM Checkout') {
       steps {
-        checkout scm
+        script {
+          checkoutSource()
+        }
         script {
           env.GIT_SHORT_SHA = sh(
             script: 'git rev-parse --short=7 HEAD',
@@ -246,7 +266,7 @@ pipeline {
           services.each { service ->
             def localImage = "${service.name}:${env.IMAGE_TAG_VALUE}"
             sh "docker build -t ${localImage} ${service.directory}"
-            env["${service.name.replace('-', '_').toUpperCase()}_LOCAL_IMAGE"] = localImage
+            localImages.put(service.name, localImage)
           }
         }
       }
@@ -256,7 +276,7 @@ pipeline {
       steps {
         script {
           services.each { service ->
-            def localImage = env["${service.name.replace('-', '_').toUpperCase()}_LOCAL_IMAGE"]
+            def localImage = localImages.get(service.name)
             sh """
               trivy image \\
                 --exit-code 1 \\
@@ -284,7 +304,7 @@ pipeline {
 
             services.each { service ->
               def repoName = configValue(service.ecrRepositoryParam)
-              def localImage = env["${service.name.replace('-', '_').toUpperCase()}_LOCAL_IMAGE"]
+              def localImage = localImages.get(service.name)
               def remoteImage = "${env.ECR_REGISTRY}/${repoName}:${env.IMAGE_TAG_VALUE}"
 
               if (configBoolean('CREATE_ECR_REPOS')) {
@@ -298,7 +318,7 @@ pipeline {
                 docker tag ${localImage} ${remoteImage}
                 docker push ${remoteImage}
               """
-              env["${service.name.replace('-', '_').toUpperCase()}_REMOTE_IMAGE"] = remoteImage
+              remoteImages.put(service.name, remoteImage)
             }
           }
         }
