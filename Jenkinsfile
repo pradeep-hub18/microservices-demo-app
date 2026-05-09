@@ -48,6 +48,8 @@ def defaultConfig(String name) {
       return ''
     case 'TRIVY_SEVERITY':
       return 'HIGH,CRITICAL'
+    case 'DOCKER_PLATFORM':
+      return 'linux/amd64'
     case 'UPDATE_HELM_VALUES':
       return 'true'
     case 'HELM_VALUES_FILE':
@@ -183,6 +185,7 @@ pipeline {
           java -version
           mvn -version
           docker --version
+          docker info --format '{{.OSType}}/{{.Architecture}}' || true
           trivy --version
           aws --version
         '''
@@ -265,7 +268,7 @@ pipeline {
         script {
           services.each { service ->
             def localImage = "${service.name}:${env.IMAGE_TAG_VALUE}"
-            sh "docker build -t ${localImage} ${service.directory}"
+            sh "docker build --platform ${configValue('DOCKER_PLATFORM')} -t ${localImage} ${service.directory}"
             localImages.put(service.name, localImage)
           }
         }
