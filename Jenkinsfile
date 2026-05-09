@@ -185,6 +185,7 @@ pipeline {
           java -version
           mvn -version
           docker --version
+          docker buildx version
           docker info --format '{{.OSType}}/{{.Architecture}}' || true
           trivy --version
           aws --version
@@ -268,7 +269,7 @@ pipeline {
         script {
           services.each { service ->
             def localImage = "${service.name}:${env.IMAGE_TAG_VALUE}"
-            sh "docker build --platform ${configValue('DOCKER_PLATFORM')} -t ${localImage} ${service.directory}"
+            sh "docker buildx build --platform ${configValue('DOCKER_PLATFORM')} --load -t ${localImage} ${service.directory}"
             localImages.put(service.name, localImage)
           }
         }
@@ -307,7 +308,6 @@ pipeline {
 
             services.each { service ->
               def repoName = configValue(service.ecrRepositoryParam)
-              def localImage = localImages.get(service.name)
               def remoteImage = "${env.ECR_REGISTRY}/${repoName}:${env.IMAGE_TAG_VALUE}"
 
               if (configBoolean('CREATE_ECR_REPOS')) {
@@ -318,8 +318,12 @@ pipeline {
               }
 
               sh """
-                docker tag ${localImage} ${remoteImage}
-                docker push ${remoteImage}
+                docker buildx build \\
+                  --platform ${configValue('DOCKER_PLATFORM')} \\
+                  --provenance=false \\
+                  -t ${remoteImage} \\
+                  --push \\
+                  ${service.directory}
               """
               remoteImages.put(service.name, remoteImage)
             }
