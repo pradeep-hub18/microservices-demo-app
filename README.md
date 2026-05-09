@@ -140,7 +140,9 @@ one ALB Ingress pointing to the existing Istio ingress gateway service
 
 The ALB Ingress is created in `istio-system` and points at `istio-ingressgateway`. Keep the application services as `ClusterIP`; do not create per-service LoadBalancer services.
 
-If your existing `istio-ingressgateway` Service is still `type: LoadBalancer`, Istio itself may already create a separate AWS load balancer. For the single-ALB design, run Istio ingress gateway as `ClusterIP` or `NodePort` and let AWS Load Balancer Controller own the external ALB.
+The ALB is provisioned by AWS Load Balancer Controller from the Kubernetes `Ingress` resource. Do not use the Terraform NLB stack for this application traffic path.
+
+If your existing `istio-ingressgateway` Service is still `type: LoadBalancer`, Istio itself may already create a separate AWS load balancer. For the single-ALB design, run Istio ingress gateway as `ClusterIP` or `NodePort` and let AWS Load Balancer Controller own the external ALB from the `Ingress`.
 
 ## Build Images
 
