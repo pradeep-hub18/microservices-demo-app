@@ -7,12 +7,12 @@ global:
 authService:
   image:
     repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/auth-service"
-    tag: "7-6d09e09"
+    tag: "8-8967068"
 
 catalogService:
   image:
     repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/catalog-service"
-    tag: "7-6d09e09"
+    tag: "8-8967068"
 
 postgresql:
   database: microapps
