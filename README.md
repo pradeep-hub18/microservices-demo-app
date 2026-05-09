@@ -60,7 +60,6 @@ Java 17+
 Maven
 Docker
 AWS CLI
-kubectl
 Trivy
 SonarQube Scanner tool configured in Jenkins
 ```
@@ -88,14 +87,60 @@ CATALOG_ECR_REPOSITORY  Default: microapps/catalog-service
 QUALITY_THRESHOLD       Default: 80
 ALERT_EMAIL             Email for quality gate and failure alerts
 AWS_CREDENTIALS_ID      Default: aws-ecr-eks-creds
-DEPLOY_TO_EKS           Set true only when Kubernetes Deployments already exist
-EKS_CLUSTER_NAME        EKS cluster used for kubectl rollout
-K8S_NAMESPACE           Namespace containing both Deployments
+UPDATE_HELM_VALUES      Default: true
+HELM_VALUES_FILE        Default: helm/microservices-demo/values-dev.yaml
 ```
 
 The pipeline can be run with the defaults using **Build Now**. If you need to override a value, set it as a Jenkins environment variable instead of a build parameter. Leave `ALERT_EMAIL` empty when SMTP is not configured.
 
 For SonarQube, create a quality gate in SonarQube with at least 80% coverage, then set `SONARQUBE_SERVER` and `SONAR_SCANNER_TOOL` to the names configured in Jenkins.
+
+## GitOps Deployment
+
+Deployment is handled by Argo CD and Helm. Jenkins does not apply Kubernetes manifests directly.
+
+The Helm chart lives at:
+
+```text
+helm/microservices-demo
+```
+
+The DEV Argo CD Application manifest lives at:
+
+```text
+argocd/microservices-demo-dev.yaml
+```
+
+Jenkins updates this file after pushing images to ECR:
+
+```text
+helm/microservices-demo/values-dev.yaml
+```
+
+GitOps-related Jenkins environment variables:
+
+```text
+UPDATE_HELM_VALUES       Default: true
+HELM_VALUES_FILE         Default: helm/microservices-demo/values-dev.yaml
+GITOPS_GIT_CREDENTIALS_ID Optional Jenkins username/password credential for Git push
+GITOPS_GIT_USER_NAME     Default: jenkins
+GITOPS_GIT_USER_EMAIL    Default: jenkins@local
+```
+
+The Helm chart creates:
+
+```text
+microservices namespace with Istio sidecar injection
+PostgreSQL StatefulSet, Service, Secret, and PVC
+auth-service Deployment and ClusterIP Service
+catalog-service Deployment and ClusterIP Service
+Istio Gateway, VirtualService, and DestinationRules
+one ALB Ingress pointing to the existing Istio ingress gateway service
+```
+
+The ALB Ingress is created in `istio-system` and points at `istio-ingressgateway`. Keep the application services as `ClusterIP`; do not create per-service LoadBalancer services.
+
+If your existing `istio-ingressgateway` Service is still `type: LoadBalancer`, Istio itself may already create a separate AWS load balancer. For the single-ALB design, run Istio ingress gateway as `ClusterIP` or `NodePort` and let AWS Load Balancer Controller own the external ALB.
 
 ## Build Images
 

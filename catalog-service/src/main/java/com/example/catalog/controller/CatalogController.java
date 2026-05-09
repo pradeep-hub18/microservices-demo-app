@@ -50,9 +50,13 @@ public class CatalogController {
     return new AppConfigResponse(authLoginUrl);
   }
 
+  @GetMapping("/catalog/config")
+  public AppConfigResponse catalogConfig() {
+    return new AppConfigResponse(authLoginUrl);
+  }
+
   @GetMapping("/health")
   public String health() {
     return "catalog-service ok";
   }
 }
-

@@ -6,7 +6,7 @@ const username = document.querySelector("#username");
 const logoutButton = document.querySelector("#logoutButton");
 
 async function loadConfig() {
-  const response = await fetch("/api/config");
+  const response = await fetch("/api/catalog/config");
   if (!response.ok) {
     return { authLoginUrl: "http://localhost:8081" };
   }
@@ -68,4 +68,3 @@ logoutButton.addEventListener("click", async () => {
 });
 
 loadCatalog();
-

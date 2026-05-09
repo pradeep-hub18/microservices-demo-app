@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "microservices-demo.authName" . }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.authService.service.port }}
+      targetPort: http
+  selector:
+    {{- include "microservices-demo.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "microservices-demo.authName" . }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: auth
+spec:
+  replicas: {{ .Values.authService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "microservices-demo.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: auth
+  template:
+    metadata:
+      labels:
+        {{- include "microservices-demo.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: auth
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: auth-service
+          image: "{{ .Values.authService.image.repository }}:{{ .Values.authService.image.tag }}"
+          imagePullPolicy: {{ .Values.authService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://{{ include "microservices-demo.postgresName" . }}:5432/{{ .Values.postgresql.database }}"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-demo.secretName" . }}
+                  key: postgres-username
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-demo.secretName" . }}
+                  key: postgres-password
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-demo.secretName" . }}
+                  key: jwt-secret
+            - name: JWT_TTL_MINUTES
+              value: {{ .Values.authService.jwt.ttlMinutes | quote }}
+            - name: DEMO_USERNAME
+              value: {{ .Values.authService.demoUser.username | quote }}
+            - name: DEMO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microservices-demo.secretName" . }}
+                  key: demo-password
+            - name: DEMO_ROLE
+              value: {{ .Values.authService.demoUser.role | quote }}
+            - name: CATALOG_URL
+              value: "{{ include "microservices-demo.publicBaseUrl" . }}/catalog/"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.authService.resources | nindent 12 }}

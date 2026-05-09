@@ -1,0 +1,25 @@
+namespace:
+  name: microservices
+
+global:
+  publicBaseUrl: ""
+
+authService:
+  image:
+    repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/auth-service"
+    tag: "latest"
+
+catalogService:
+  image:
+    repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/catalog-service"
+    tag: "latest"
+
+postgresql:
+  database: microapps
+  username: microapps
+  password: microapps
+  storage:
+    size: 8Gi
+
+albIngress:
+  host: ""

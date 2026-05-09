@@ -68,6 +68,7 @@ class CatalogControllerTest {
   @Test
   void exposesFrontendConfigAndHealth() {
     assertThat(controller.config().authLoginUrl()).isEqualTo("http://auth-service");
+    assertThat(controller.catalogConfig().authLoginUrl()).isEqualTo("http://auth-service");
     assertThat(controller.health()).isEqualTo("catalog-service ok");
   }
 }

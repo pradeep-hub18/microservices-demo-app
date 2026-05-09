@@ -1,0 +1,9 @@
+{{- if .Values.namespace.create }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+    istio-injection: {{ .Values.namespace.istioInjection | quote }}
+{{- end }}

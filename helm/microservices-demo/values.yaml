@@ -1,0 +1,106 @@
+nameOverride: ""
+fullnameOverride: ""
+
+namespace:
+  create: true
+  name: microservices
+  istioInjection: enabled
+
+global:
+  publicBaseUrl: ""
+  imagePullSecrets: []
+
+authService:
+  replicaCount: 2
+  image:
+    repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/auth-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  jwt:
+    ttlMinutes: 60
+    secret: "change-this-demo-secret-to-at-least-32-characters"
+  demoUser:
+    username: admin
+    password: "Password123!"
+    role: ADMIN
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+catalogService:
+  replicaCount: 2
+  image:
+    repository: "152406482015.dkr.ecr.ap-south-1.amazonaws.com/microapps/catalog-service"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  database: microapps
+  username: microapps
+  password: microapps
+  storage:
+    size: 8Gi
+    storageClassName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+istio:
+  enabled: true
+  gateway:
+    name: microservices-demo-gateway
+    selector:
+      istio: ingressgateway
+    hosts:
+      - "*"
+  virtualService:
+    name: microservices-demo
+    hosts:
+      - "*"
+  destinationRule:
+    enabled: true
+    trafficPolicy:
+      tls:
+        mode: ISTIO_MUTUAL
+
+albIngress:
+  enabled: true
+  name: microservices-demo-alb
+  namespace: istio-system
+  ingressClassName: alb
+  host: ""
+  istioIngressGatewayService:
+    name: istio-ingressgateway
+    port: 80
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/group.name: microservices-demo
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz/ready
+    alb.ingress.kubernetes.io/healthcheck-port: "15021"
+    alb.ingress.kubernetes.io/success-codes: "200"

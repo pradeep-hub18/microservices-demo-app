@@ -1,0 +1,114 @@
+{{- if .Values.istio.enabled }}
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: {{ .Values.istio.gateway.name }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- toYaml .Values.istio.gateway.selector | nindent 4 }}
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        {{- toYaml .Values.istio.gateway.hosts | nindent 8 }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ .Values.istio.virtualService.name }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml .Values.istio.virtualService.hosts | nindent 4 }}
+  gateways:
+    - {{ .Values.istio.gateway.name }}
+  http:
+    - match:
+        - uri:
+            exact: /catalog
+      redirect:
+        uri: /catalog/
+    - match:
+        - uri:
+            prefix: /catalog/
+      rewrite:
+        uri: /
+      route:
+        - destination:
+            host: {{ include "microservices-demo.catalogName" . }}
+            port:
+              number: {{ .Values.catalogService.service.port }}
+    - match:
+        - uri:
+            prefix: /api/catalog
+      route:
+        - destination:
+            host: {{ include "microservices-demo.catalogName" . }}
+            port:
+              number: {{ .Values.catalogService.service.port }}
+    - match:
+        - uri:
+            prefix: /api/auth
+        - uri:
+            exact: /api/config
+      route:
+        - destination:
+            host: {{ include "microservices-demo.authName" . }}
+            port:
+              number: {{ .Values.authService.service.port }}
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: {{ include "microservices-demo.authName" . }}
+            port:
+              number: {{ .Values.authService.service.port }}
+{{- if .Values.istio.destinationRule.enabled }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "microservices-demo.authName" . }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+spec:
+  host: {{ include "microservices-demo.authName" . }}
+  trafficPolicy:
+    {{- toYaml .Values.istio.destinationRule.trafficPolicy | nindent 4 }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "microservices-demo.catalogName" . }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+spec:
+  host: {{ include "microservices-demo.catalogName" . }}
+  trafficPolicy:
+    {{- toYaml .Values.istio.destinationRule.trafficPolicy | nindent 4 }}
+{{- if .Values.postgresql.enabled }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ include "microservices-demo.postgresName" . }}
+  namespace: {{ include "microservices-demo.namespace" . }}
+  labels:
+    {{- include "microservices-demo.labels" . | nindent 4 }}
+spec:
+  host: {{ include "microservices-demo.postgresName" . }}
+  trafficPolicy:
+    {{- toYaml .Values.istio.destinationRule.trafficPolicy | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

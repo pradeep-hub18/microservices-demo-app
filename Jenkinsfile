@@ -3,15 +3,13 @@ def services = [
     name: 'auth-service',
     directory: 'auth-service',
     ecrRepositoryParam: 'AUTH_ECR_REPOSITORY',
-    deploymentParam: 'AUTH_K8S_DEPLOYMENT',
-    containerParam: 'AUTH_K8S_CONTAINER'
+    helmValuesKey: 'authService'
   ],
   [
     name: 'catalog-service',
     directory: 'catalog-service',
     ecrRepositoryParam: 'CATALOG_ECR_REPOSITORY',
-    deploymentParam: 'CATALOG_K8S_DEPLOYMENT',
-    containerParam: 'CATALOG_K8S_CONTAINER'
+    helmValuesKey: 'catalogService'
   ]
 ]
 
@@ -43,20 +41,16 @@ def defaultConfig(String name) {
       return ''
     case 'TRIVY_SEVERITY':
       return 'HIGH,CRITICAL'
-    case 'DEPLOY_TO_EKS':
-      return 'false'
-    case 'EKS_CLUSTER_NAME':
-      return 'demo-eks-DEV-eks-cluster'
-    case 'K8S_NAMESPACE':
-      return 'default'
-    case 'AUTH_K8S_DEPLOYMENT':
-      return 'auth-service'
-    case 'CATALOG_K8S_DEPLOYMENT':
-      return 'catalog-service'
-    case 'AUTH_K8S_CONTAINER':
-      return 'auth-service'
-    case 'CATALOG_K8S_CONTAINER':
-      return 'catalog-service'
+    case 'UPDATE_HELM_VALUES':
+      return 'true'
+    case 'HELM_VALUES_FILE':
+      return 'helm/microservices-demo/values-dev.yaml'
+    case 'GITOPS_GIT_CREDENTIALS_ID':
+      return ''
+    case 'GITOPS_GIT_USER_NAME':
+      return 'jenkins'
+    case 'GITOPS_GIT_USER_EMAIL':
+      return 'jenkins@local'
     default:
       return ''
   }
@@ -117,6 +111,21 @@ def runWithAwsCredentials(Closure body) {
   }
 }
 
+def runWithGitCredentials(Closure body) {
+  def gitCredentialsId = configValue('GITOPS_GIT_CREDENTIALS_ID')
+  if (gitCredentialsId) {
+    withCredentials([usernamePassword(
+      credentialsId: gitCredentialsId,
+      usernameVariable: 'GITOPS_USERNAME',
+      passwordVariable: 'GITOPS_PASSWORD'
+    )]) {
+      body(true)
+    }
+  } else {
+    body(false)
+  }
+}
+
 pipeline {
   agent any
 
@@ -156,7 +165,6 @@ pipeline {
           docker --version
           trivy --version
           aws --version
-          kubectl version --client=true
         '''
       }
     }
@@ -297,25 +305,90 @@ pipeline {
       }
     }
 
-    stage('Deploy to EKS') {
+    stage('Update Helm Image Tags') {
       when {
-        expression { return configBoolean('DEPLOY_TO_EKS') }
+        expression { return configBoolean('UPDATE_HELM_VALUES') }
       }
       steps {
         script {
-          runWithAwsCredentials {
-            sh "aws eks update-kubeconfig --region ${configValue('AWS_REGION')} --name ${configValue('EKS_CLUSTER_NAME')}"
+          def valuesFile = configValue('HELM_VALUES_FILE')
 
-            services.each { service ->
-              def remoteImage = env["${service.name.replace('-', '_').toUpperCase()}_REMOTE_IMAGE"]
-              def deployment = configValue(service.deploymentParam)
-              def container = configValue(service.containerParam)
+          withEnv([
+            "HELM_VALUES_FILE=${valuesFile}",
+            "AUTH_IMAGE_TAG=${env.IMAGE_TAG_VALUE}",
+            "CATALOG_IMAGE_TAG=${env.IMAGE_TAG_VALUE}"
+          ]) {
+            sh '''
+              set -e
+              python3 <<'PY'
+from pathlib import Path
+import os
+import re
 
-              sh """
-                kubectl -n ${configValue('K8S_NAMESPACE')} set image deployment/${deployment} ${container}=${remoteImage}
-                kubectl -n ${configValue('K8S_NAMESPACE')} rollout status deployment/${deployment} --timeout=180s
-              """
+path = Path(os.environ["HELM_VALUES_FILE"])
+lines = path.read_text().splitlines()
+updates = {
+    "authService": os.environ["AUTH_IMAGE_TAG"],
+    "catalogService": os.environ["CATALOG_IMAGE_TAG"],
+}
+
+current_section = None
+inside_image = False
+
+for index, line in enumerate(lines):
+    stripped = line.strip()
+    if line and not line.startswith(" ") and stripped.endswith(":"):
+        current_section = stripped[:-1]
+        inside_image = False
+        continue
+
+    if current_section in updates and re.match(r"^\\s{2}image:\\s*$", line):
+        inside_image = True
+        continue
+
+    if current_section in updates and inside_image and re.match(r"^\\s{4}tag:", line):
+        indent = line[: len(line) - len(line.lstrip())]
+        lines[index] = f'{indent}tag: "{updates[current_section]}"'
+
+path.write_text("\\n".join(lines) + "\\n")
+PY
+            '''
+          }
+
+          def hasChanges = sh(
+            script: "git diff --quiet -- ${valuesFile}",
+            returnStatus: true
+          ) != 0
+
+          if (hasChanges) {
+            sh """
+              git config user.name '${configValue('GITOPS_GIT_USER_NAME')}'
+              git config user.email '${configValue('GITOPS_GIT_USER_EMAIL')}'
+              git add ${valuesFile}
+              git commit -m 'Update Helm image tags to ${env.IMAGE_TAG_VALUE} [skip ci]'
+            """
+
+            runWithGitCredentials { hasGitCredentials ->
+              if (hasGitCredentials) {
+                sh '''
+                  set -e
+                  remote_url="$(git config --get remote.origin.url)"
+                  case "$remote_url" in
+                    https://*)
+                      push_url="$(printf '%s' "$remote_url" | sed "s#https://#https://${GITOPS_USERNAME}:${GITOPS_PASSWORD}@#")"
+                      ;;
+                    *)
+                      push_url="$remote_url"
+                      ;;
+                  esac
+                  git push "$push_url" "HEAD:${BRANCH_NAME:-main}"
+                '''
+              } else {
+                sh 'git push origin "HEAD:${BRANCH_NAME:-main}"'
+              }
             }
+          } else {
+            echo "No Helm image tag changes detected in ${valuesFile}."
           }
         }
       }
