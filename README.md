@@ -78,7 +78,7 @@ Credentials Binding
 Workspace Cleanup
 ```
 
-Important Jenkins parameters:
+Important Jenkins environment variables:
 
 ```text
 AWS_ACCOUNT_ID          Default: 152406482015
@@ -93,7 +93,7 @@ EKS_CLUSTER_NAME        EKS cluster used for kubectl rollout
 K8S_NAMESPACE           Namespace containing both Deployments
 ```
 
-The pipeline can be run with the defaults. Leave `ALERT_EMAIL` empty when SMTP is not configured.
+The pipeline can be run with the defaults using **Build Now**. If you need to override a value, set it as a Jenkins environment variable instead of a build parameter. Leave `ALERT_EMAIL` empty when SMTP is not configured.
 
 For SonarQube, create a quality gate in SonarQube with at least 80% coverage, then set `SONARQUBE_SERVER` and `SONAR_SCANNER_TOOL` to the names configured in Jenkins.
 

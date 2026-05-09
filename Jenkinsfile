@@ -15,10 +15,70 @@ def services = [
   ]
 ]
 
+def defaultConfig(String name) {
+  switch (name) {
+    case 'SONARQUBE_SERVER':
+      return 'SonarQube'
+    case 'SONAR_SCANNER_TOOL':
+      return 'SonarScanner'
+    case 'SONAR_PROJECT_PREFIX':
+      return 'microservices-demo-app'
+    case 'QUALITY_THRESHOLD':
+      return '80'
+    case 'ALERT_EMAIL':
+      return ''
+    case 'AWS_REGION':
+      return 'ap-south-1'
+    case 'AWS_ACCOUNT_ID':
+      return '152406482015'
+    case 'AWS_CREDENTIALS_ID':
+      return 'aws-ecr-eks-creds'
+    case 'AUTH_ECR_REPOSITORY':
+      return 'microapps/auth-service'
+    case 'CATALOG_ECR_REPOSITORY':
+      return 'microapps/catalog-service'
+    case 'CREATE_ECR_REPOS':
+      return 'true'
+    case 'IMAGE_TAG':
+      return ''
+    case 'TRIVY_SEVERITY':
+      return 'HIGH,CRITICAL'
+    case 'DEPLOY_TO_EKS':
+      return 'false'
+    case 'EKS_CLUSTER_NAME':
+      return 'demo-eks-DEV-eks-cluster'
+    case 'K8S_NAMESPACE':
+      return 'default'
+    case 'AUTH_K8S_DEPLOYMENT':
+      return 'auth-service'
+    case 'CATALOG_K8S_DEPLOYMENT':
+      return 'catalog-service'
+    case 'AUTH_K8S_CONTAINER':
+      return 'auth-service'
+    case 'CATALOG_K8S_CONTAINER':
+      return 'catalog-service'
+    default:
+      return ''
+  }
+}
+
+def configValue(String name) {
+  def value = env[name]
+  if (value?.trim()) {
+    return value.trim()
+  }
+  return defaultConfig(name)
+}
+
+def configBoolean(String name) {
+  return configValue(name).toBoolean()
+}
+
 def sendAlert(String subject, String body) {
-  if (params.ALERT_EMAIL?.trim()) {
+  def alertEmail = configValue('ALERT_EMAIL')
+  if (alertEmail) {
     emailext(
-      to: params.ALERT_EMAIL.trim(),
+      to: alertEmail,
       subject: subject,
       body: body
     )
@@ -44,10 +104,11 @@ def jacocoLineCoverage(String reportPath) {
 }
 
 def runWithAwsCredentials(Closure body) {
-  if (params.AWS_CREDENTIALS_ID?.trim()) {
+  def awsCredentialsId = configValue('AWS_CREDENTIALS_ID')
+  if (awsCredentialsId) {
     withCredentials([[
       $class: 'AmazonWebServicesCredentialsBinding',
-      credentialsId: params.AWS_CREDENTIALS_ID.trim()
+      credentialsId: awsCredentialsId
     ]]) {
       body()
     }
@@ -65,31 +126,6 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
 
-  parameters {
-    string(name: 'SONARQUBE_SERVER', defaultValue: 'SonarQube', description: 'Jenkins SonarQube server name from Manage Jenkins > System.')
-    string(name: 'SONAR_SCANNER_TOOL', defaultValue: 'SonarScanner', description: 'Jenkins SonarQube Scanner tool name.')
-    string(name: 'SONAR_PROJECT_PREFIX', defaultValue: 'microservices-demo-app', description: 'Prefix used for the two SonarQube project keys.')
-    string(name: 'QUALITY_THRESHOLD', defaultValue: '80', description: 'Minimum JaCoCo line coverage percentage required for each service.')
-    string(name: 'ALERT_EMAIL', defaultValue: '', description: 'Email address for quality/vulnerability/deployment alerts.')
-
-    string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS region for ECR and EKS.')
-    string(name: 'AWS_ACCOUNT_ID', defaultValue: '152406482015', description: 'AWS account ID that owns the target ECR repositories.')
-    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-ecr-eks-creds', description: 'Optional Jenkins AWS credentials ID. Leave empty when the agent already has AWS permissions.')
-    string(name: 'AUTH_ECR_REPOSITORY', defaultValue: 'microapps/auth-service', description: 'ECR repository name for auth-service.')
-    string(name: 'CATALOG_ECR_REPOSITORY', defaultValue: 'microapps/catalog-service', description: 'ECR repository name for catalog-service.')
-    booleanParam(name: 'CREATE_ECR_REPOS', defaultValue: true, description: 'Create ECR repositories if they do not already exist.')
-    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Optional image tag. If empty Jenkins uses BUILD_NUMBER-gitsha.')
-    string(name: 'TRIVY_SEVERITY', defaultValue: 'HIGH,CRITICAL', description: 'Trivy severities that fail the build.')
-
-    booleanParam(name: 'DEPLOY_TO_EKS', defaultValue: false, description: 'Update existing Kubernetes deployments after pushing images.')
-    string(name: 'EKS_CLUSTER_NAME', defaultValue: 'demo-eks-DEV-eks-cluster', description: 'EKS cluster name used when DEPLOY_TO_EKS is true.')
-    string(name: 'K8S_NAMESPACE', defaultValue: 'default', description: 'Kubernetes namespace containing the app deployments.')
-    string(name: 'AUTH_K8S_DEPLOYMENT', defaultValue: 'auth-service', description: 'Existing Kubernetes Deployment name for auth-service.')
-    string(name: 'CATALOG_K8S_DEPLOYMENT', defaultValue: 'catalog-service', description: 'Existing Kubernetes Deployment name for catalog-service.')
-    string(name: 'AUTH_K8S_CONTAINER', defaultValue: 'auth-service', description: 'Container name inside the auth-service Deployment.')
-    string(name: 'CATALOG_K8S_CONTAINER', defaultValue: 'catalog-service', description: 'Container name inside the catalog-service Deployment.')
-  }
-
   environment {
     MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
   }
@@ -103,10 +139,10 @@ pipeline {
             script: 'git rev-parse --short=7 HEAD',
             returnStdout: true
           ).trim()
-          env.IMAGE_TAG_VALUE = params.IMAGE_TAG?.trim()
-            ? params.IMAGE_TAG.trim()
+          env.IMAGE_TAG_VALUE = configValue('IMAGE_TAG')
+            ? configValue('IMAGE_TAG')
             : "${env.BUILD_NUMBER}-${env.GIT_SHORT_SHA}"
-          env.ECR_REGISTRY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
+          env.ECR_REGISTRY = "${configValue('AWS_ACCOUNT_ID')}.dkr.ecr.${configValue('AWS_REGION')}.amazonaws.com"
         }
       }
     }
@@ -136,8 +172,8 @@ pipeline {
             def coverage = jacocoLineCoverage("${service.directory}/target/site/jacoco/jacoco.xml")
             echo "${service.name} JaCoCo line coverage: ${String.format('%.2f', coverage)}%"
 
-            if (coverage < params.QUALITY_THRESHOLD.toDouble()) {
-              def message = "${service.name} line coverage is ${String.format('%.2f', coverage)}%, below required ${params.QUALITY_THRESHOLD}%."
+            if (coverage < configValue('QUALITY_THRESHOLD').toDouble()) {
+              def message = "${service.name} line coverage is ${String.format('%.2f', coverage)}%, below required ${configValue('QUALITY_THRESHOLD')}%."
               sendAlert("Jenkins quality alert: ${service.name}", message)
               error(message)
             }
@@ -149,14 +185,14 @@ pipeline {
     stage('SonarQube Scan and Quality Gate') {
       steps {
         script {
-          def scannerHome = tool params.SONAR_SCANNER_TOOL
+          def scannerHome = tool configValue('SONAR_SCANNER_TOOL')
 
           services.each { service ->
-            withSonarQubeEnv(params.SONARQUBE_SERVER) {
+            withSonarQubeEnv(configValue('SONARQUBE_SERVER')) {
               sh """
                 ${scannerHome}/bin/sonar-scanner \\
-                  -Dsonar.projectKey=${params.SONAR_PROJECT_PREFIX}-${service.name} \\
-                  -Dsonar.projectName=${params.SONAR_PROJECT_PREFIX}-${service.name} \\
+                  -Dsonar.projectKey=${configValue('SONAR_PROJECT_PREFIX')}-${service.name} \\
+                  -Dsonar.projectName=${configValue('SONAR_PROJECT_PREFIX')}-${service.name} \\
                   -Dsonar.sources=${service.directory}/src/main/java,${service.directory}/src/main/resources/static \\
                   -Dsonar.tests=${service.directory}/src/test/java \\
                   -Dsonar.java.binaries=${service.directory}/target/classes \\
@@ -186,7 +222,7 @@ pipeline {
             sh """
               trivy fs \\
                 --exit-code 1 \\
-                --severity ${params.TRIVY_SEVERITY} \\
+                --severity ${configValue('TRIVY_SEVERITY')} \\
                 --scanners vuln,secret,misconfig \\
                 --ignore-unfixed \\
                 ${service.directory}
@@ -216,7 +252,7 @@ pipeline {
             sh """
               trivy image \\
                 --exit-code 1 \\
-                --severity ${params.TRIVY_SEVERITY} \\
+                --severity ${configValue('TRIVY_SEVERITY')} \\
                 --ignore-unfixed \\
                 ${localImage}
             """
@@ -228,25 +264,25 @@ pipeline {
     stage('Push Images to ECR') {
       steps {
         script {
-          if (!params.AWS_ACCOUNT_ID?.trim()) {
+          if (!configValue('AWS_ACCOUNT_ID')) {
             error('AWS_ACCOUNT_ID is required to push images to ECR.')
           }
 
           runWithAwsCredentials {
             sh """
-              aws ecr get-login-password --region ${params.AWS_REGION} \\
+              aws ecr get-login-password --region ${configValue('AWS_REGION')} \\
                 | docker login --username AWS --password-stdin ${env.ECR_REGISTRY}
             """
 
             services.each { service ->
-              def repoName = params[service.ecrRepositoryParam]
+              def repoName = configValue(service.ecrRepositoryParam)
               def localImage = env["${service.name.replace('-', '_').toUpperCase()}_LOCAL_IMAGE"]
               def remoteImage = "${env.ECR_REGISTRY}/${repoName}:${env.IMAGE_TAG_VALUE}"
 
-              if (params.CREATE_ECR_REPOS) {
+              if (configBoolean('CREATE_ECR_REPOS')) {
                 sh """
-                  aws ecr describe-repositories --region ${params.AWS_REGION} --repository-names ${repoName} >/dev/null 2>&1 \\
-                    || aws ecr create-repository --region ${params.AWS_REGION} --repository-name ${repoName} >/dev/null
+                  aws ecr describe-repositories --region ${configValue('AWS_REGION')} --repository-names ${repoName} >/dev/null 2>&1 \\
+                    || aws ecr create-repository --region ${configValue('AWS_REGION')} --repository-name ${repoName} >/dev/null
                 """
               }
 
@@ -263,21 +299,21 @@ pipeline {
 
     stage('Deploy to EKS') {
       when {
-        expression { return params.DEPLOY_TO_EKS }
+        expression { return configBoolean('DEPLOY_TO_EKS') }
       }
       steps {
         script {
           runWithAwsCredentials {
-            sh "aws eks update-kubeconfig --region ${params.AWS_REGION} --name ${params.EKS_CLUSTER_NAME}"
+            sh "aws eks update-kubeconfig --region ${configValue('AWS_REGION')} --name ${configValue('EKS_CLUSTER_NAME')}"
 
             services.each { service ->
               def remoteImage = env["${service.name.replace('-', '_').toUpperCase()}_REMOTE_IMAGE"]
-              def deployment = params[service.deploymentParam]
-              def container = params[service.containerParam]
+              def deployment = configValue(service.deploymentParam)
+              def container = configValue(service.containerParam)
 
               sh """
-                kubectl -n ${params.K8S_NAMESPACE} set image deployment/${deployment} ${container}=${remoteImage}
-                kubectl -n ${params.K8S_NAMESPACE} rollout status deployment/${deployment} --timeout=180s
+                kubectl -n ${configValue('K8S_NAMESPACE')} set image deployment/${deployment} ${container}=${remoteImage}
+                kubectl -n ${configValue('K8S_NAMESPACE')} rollout status deployment/${deployment} --timeout=180s
               """
             }
           }
