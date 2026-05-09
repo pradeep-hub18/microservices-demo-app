@@ -73,8 +73,8 @@ pipeline {
     string(name: 'ALERT_EMAIL', defaultValue: '', description: 'Email address for quality/vulnerability/deployment alerts.')
 
     string(name: 'AWS_REGION', defaultValue: 'ap-south-1', description: 'AWS region for ECR and EKS.')
-    string(name: 'AWS_ACCOUNT_ID', defaultValue: '', description: 'AWS account ID that owns the target ECR repositories.')
-    string(name: 'AWS_CREDENTIALS_ID', defaultValue: '', description: 'Optional Jenkins AWS credentials ID. Leave empty when the agent already has AWS permissions.')
+    string(name: 'AWS_ACCOUNT_ID', defaultValue: '152406482015', description: 'AWS account ID that owns the target ECR repositories.')
+    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-ecr-eks-creds', description: 'Optional Jenkins AWS credentials ID. Leave empty when the agent already has AWS permissions.')
     string(name: 'AUTH_ECR_REPOSITORY', defaultValue: 'microapps/auth-service', description: 'ECR repository name for auth-service.')
     string(name: 'CATALOG_ECR_REPOSITORY', defaultValue: 'microapps/catalog-service', description: 'ECR repository name for catalog-service.')
     booleanParam(name: 'CREATE_ECR_REPOS', defaultValue: true, description: 'Create ECR repositories if they do not already exist.')

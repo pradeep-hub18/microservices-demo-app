@@ -81,16 +81,19 @@ Workspace Cleanup
 Important Jenkins parameters:
 
 ```text
-AWS_ACCOUNT_ID          AWS account where ECR repositories live
+AWS_ACCOUNT_ID          Default: 152406482015
 AWS_REGION              Default: ap-south-1
 AUTH_ECR_REPOSITORY     Default: microapps/auth-service
 CATALOG_ECR_REPOSITORY  Default: microapps/catalog-service
 QUALITY_THRESHOLD       Default: 80
 ALERT_EMAIL             Email for quality gate and failure alerts
+AWS_CREDENTIALS_ID      Default: aws-ecr-eks-creds
 DEPLOY_TO_EKS           Set true only when Kubernetes Deployments already exist
 EKS_CLUSTER_NAME        EKS cluster used for kubectl rollout
 K8S_NAMESPACE           Namespace containing both Deployments
 ```
+
+The pipeline can be run with the defaults. Leave `ALERT_EMAIL` empty when SMTP is not configured.
 
 For SonarQube, create a quality gate in SonarQube with at least 80% coverage, then set `SONARQUBE_SERVER` and `SONAR_SCANNER_TOOL` to the names configured in Jenkins.
 
