@@ -328,8 +328,8 @@ pipeline {
               sh """
                 docker tag ${localImage} ${remoteImage}
                 docker push ${remoteImage}
-                docker buildx imagetools inspect ${remoteImage} | tee ${service.name}-manifest.txt
-                grep -q '${eksImagePlatform}' ${service.name}-manifest.txt
+                docker manifest inspect -v ${remoteImage} | tee ${service.name}-manifest.json
+                grep -q '"architecture": "${eksImageArchitecture}"' ${service.name}-manifest.json
               """
               remoteImages.put(service.name, remoteImage)
             }
