@@ -15,6 +15,8 @@ def services = [
 
 def localImages = [:]
 def remoteImages = [:]
+def eksImagePlatform = 'linux/amd64'
+def eksImageArchitecture = 'amd64'
 
 def defaultConfig(String name) {
   switch (name) {
@@ -48,8 +50,6 @@ def defaultConfig(String name) {
       return ''
     case 'TRIVY_SEVERITY':
       return 'HIGH,CRITICAL'
-    case 'DOCKER_PLATFORM':
-      return 'linux/amd64'
     case 'UPDATE_HELM_VALUES':
       return 'true'
     case 'HELM_VALUES_FILE':
@@ -269,7 +269,14 @@ pipeline {
         script {
           services.each { service ->
             def localImage = "${service.name}:${env.IMAGE_TAG_VALUE}"
-            sh "docker buildx build --platform ${configValue('DOCKER_PLATFORM')} --load -t ${localImage} ${service.directory}"
+            sh "docker buildx build --platform ${eksImagePlatform} --provenance=false --sbom=false --load -t ${localImage} ${service.directory}"
+            def imageArchitecture = sh(
+              script: "docker image inspect ${localImage} --format '{{.Architecture}}'",
+              returnStdout: true
+            ).trim()
+            if (imageArchitecture != eksImageArchitecture) {
+              error("${localImage} was built as ${imageArchitecture}, expected ${eksImageArchitecture}.")
+            }
             localImages.put(service.name, localImage)
           }
         }
@@ -308,6 +315,7 @@ pipeline {
 
             services.each { service ->
               def repoName = configValue(service.ecrRepositoryParam)
+              def localImage = localImages.get(service.name)
               def remoteImage = "${env.ECR_REGISTRY}/${repoName}:${env.IMAGE_TAG_VALUE}"
 
               if (configBoolean('CREATE_ECR_REPOS')) {
@@ -318,12 +326,10 @@ pipeline {
               }
 
               sh """
-                docker buildx build \\
-                  --platform ${configValue('DOCKER_PLATFORM')} \\
-                  --provenance=false \\
-                  -t ${remoteImage} \\
-                  --push \\
-                  ${service.directory}
+                docker tag ${localImage} ${remoteImage}
+                docker push ${remoteImage}
+                docker buildx imagetools inspect ${remoteImage} | tee ${service.name}-manifest.txt
+                grep -q '${eksImagePlatform}' ${service.name}-manifest.txt
               """
               remoteImages.put(service.name, remoteImage)
             }
